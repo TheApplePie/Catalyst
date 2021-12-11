@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="GLFW\" />
+    <Folder Include="ImGui\" />
+    <Folder Include="Vulkan\" />
+  </ItemGroup>
+
+</Project>
