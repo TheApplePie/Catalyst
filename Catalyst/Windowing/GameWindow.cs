@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-using Catalyst.GLFW;
+using GLFW3;
 
 namespace Catalyst.Windowing
 {
