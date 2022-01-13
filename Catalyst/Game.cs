@@ -5,9 +5,14 @@ using Vulkan;
 
 namespace Catalyst
 {
+    /* TODO:
+     * Support Multiple Renderer Contexts & Windows
+     * 
+     */
+    
     public class Game
     {
-        public Window[] Windows;
+        public GameWindow Windows;
 
         public GameState State;
         
@@ -20,6 +25,19 @@ namespace Catalyst
         public Game()
         {
             State = GameState.Running;
+        }
+
+        public void Start()
+        {
+            while (State != GameState.Exiting)
+            {
+                switch (State)
+                {
+                    
+                }
+                
+                GLFW.PollEvents();
+            }
         }
     }
 
