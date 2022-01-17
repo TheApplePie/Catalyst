@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Catalyst.Windowing;
 using GLFW3;
 using Vulkan;
-using RPG.Rendering;
+using Catalyst.Rendering;
+using Version = Vulkan.Version;
 
 namespace Catalyst
 {
@@ -23,11 +25,7 @@ namespace Catalyst
         public ApplicationInfo AppInfo;
 
         public Renderer Renderer;
-        public RenderContext Context;
-        public RenderPipeline Pipeline;
-        
-        private RendererCreateInfo _rendererCreateInfo;
-        
+
         static Game()
         {
             GLFW.WindowHint(Hint.ClientApi, ClientApi.None);
@@ -46,17 +44,13 @@ namespace Catalyst
             
             Window = new GameWindow(new GameWindowCreateInfo(1000,1000,"test"));
 
-            _rendererCreateInfo = new RendererCreateInfo(AppInfo, Window.Window, false, false);
-            Renderer = new Renderer(_rendererCreateInfo);
-
-            Context = Renderer.CreateContext();
-
             State = GameState.Running;
+
+            Renderer = new Renderer(Window.Window);
             
             //LOAD RESOURCES
             
             Window.Show();
-
             while (State != GameState.Exiting)
             {
                 switch (State)
@@ -74,10 +68,7 @@ namespace Catalyst
 
         public void Update() //Happens every frame
         {
-            while (!GLFW.WindowShouldClose(Window.Window))
-            {
-                GLFW.PollEvents();
-            }
+            GLFW.PollEvents();
         }
     }
 

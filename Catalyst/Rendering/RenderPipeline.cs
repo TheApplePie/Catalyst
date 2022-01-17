@@ -1,4 +1,4 @@
-namespace RPG.Rendering
+namespace Catalyst.Rendering
 {
     public class RenderPipeline
     {
