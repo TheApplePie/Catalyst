@@ -27,7 +27,10 @@ namespace Catalyst.Windowing
             GLFW.GetWindowSize(Window, out int width, out int height);
             return new Vector2(width, height);
         }
-
+        
+        public void Show() => GLFW.ShowWindow(Window);
+        public void Hide() => GLFW.HideWindow(Window);
+        
         public void SetWindowSize(int width, int height) { GLFW.SetWindowSize(Window, width, height); }
     }
 }

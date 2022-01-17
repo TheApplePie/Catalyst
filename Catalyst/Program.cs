@@ -15,8 +15,6 @@ namespace Catalyst
         public static void Main(string[] args)
         {
             Game g = new Game();
-            g.Windows = new GameWindow(new GameWindowCreateInfo(1000, 1000, "test"));
-
             g.Start();
         }
     }

@@ -55,7 +55,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <Folder Include="Rendering" />
+    <Folder Include="Rendering\Pipelines" />
   </ItemGroup>
 
 </Project>
