@@ -13,17 +13,22 @@ namespace Catalyst.Rendering
     public class Renderer
     {
         public static VK.Instance Instance;
-
         public static VK.ApplicationInfo AppInfo;
 
         public static VK.ExtensionProperties[] Extensions;
         public static VK.LayerProperties[] Layers;
         
         public static bool UseAllocCallbacks = false;
-        public static bool UseDebugCallback = false;
+        public static bool UseDebugCallback =
+#if DEBUG
+            true;
+#else
+            false;
+#endif
 
         private static DebugReportCallbackExt _debugReportCallback;
 
+        public VK.PhysicalDevice PhysicalDevice;
         public VK.Device Device;
         public SurfaceKhr Surface;
         
@@ -123,7 +128,6 @@ namespace Catalyst.Rendering
 
             foreach (VK.PhysicalDevice device in physicalDevices)
             {
-                device.GetProperties();
                 VK.QueueFamilyProperties[] queueFamilyProperties = device.GetQueueFamilyProperties();
 
                 for (int i = 0; i < queueFamilyProperties.Length; i++)
@@ -154,7 +158,9 @@ namespace Catalyst.Rendering
             foreach (string extension in requiredExtensions)
                 if (physicalDevice.EnumerateExtensionProperties().All(i => i.ExtensionName != extension))
                     throw new System.Exception($"Required Device Extension: {extension} not found");
-
+            
+            //physicalDevice.GetSurfaceSupportKhr()
+            
             bool sameGraphicsAndPresent = _graphicsQueueFamilyIndex == _presentQueueFamilyIndex;
             VK.DeviceQueueCreateInfo[] queueCreateInfos = new VK.DeviceQueueCreateInfo[sameGraphicsAndPresent ? 1 : 2];
             queueCreateInfos[0] = new VK.DeviceQueueCreateInfo(_graphicsQueueFamilyIndex, 1, 1.0f);
@@ -194,7 +200,7 @@ namespace Catalyst.Rendering
         
         private static SurfaceKhr CreateSurface(Window window)
         {
-            GLFW3.Vulkan.CreateWindowSurface(Instance.Handle, window, IntPtr.Zero,
+            GLFW3.Vulkan.CreateWindowSurface(Instance.Handle, window, IntPtr.Zero, 
                 out ulong surfaceHandle);
             
             VK.AllocationCallbacks? allocationCallbacks = Instance.Allocator;

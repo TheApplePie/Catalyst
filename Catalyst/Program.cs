@@ -16,6 +16,8 @@ namespace Catalyst
         {
             Game g = new Game();
             g.Start();
+            
+            GLFW.Terminate();
         }
     }
 }
