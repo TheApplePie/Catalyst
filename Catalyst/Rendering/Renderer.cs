@@ -40,6 +40,7 @@ namespace Catalyst.Rendering
 
         public SwapchainKhr Swapchain;
         public VK.Image[] Framebuffer;
+        public VK.ImageView[] SwapchainImageViews;
 
         private int _graphicsQueueFamilyIndex = -1;
         private int _computeQueueFamilyIndex = -1;
@@ -97,10 +98,10 @@ namespace Catalyst.Rendering
             Surface = surface;
         
             //Setup Device
-            VK.PhysicalDevice physicalDevice = GetPhysicalDevice(Surface);
+            PhysicalDevice = GetPhysicalDevice(Surface);
 
             string[] requiredDeviceExtensions = {"VK_KHR_swapchain"};
-            Device = CreateDevice(physicalDevice, requiredDeviceExtensions);
+            Device = CreateDevice(PhysicalDevice, requiredDeviceExtensions);
 
             // Get queue(s).
             GraphicsQueue = Device.GetQueue(_graphicsQueueFamilyIndex);
@@ -115,8 +116,15 @@ namespace Catalyst.Rendering
             GraphicsCommandPool = Device.CreateCommandPool(new VK.CommandPoolCreateInfo(_graphicsQueueFamilyIndex));
             ComputeCommandPool = Device.CreateCommandPool(new VK.CommandPoolCreateInfo(_computeQueueFamilyIndex));
 
-            Swapchain = CreateSwapchain(Instance, Device, Surface);
+            Swapchain = CreateSwapchain();
             Framebuffer = Swapchain.GetImages();
+            SwapchainImageViews = new VK.ImageView[Framebuffer.Length];
+
+            for (int i = 0; i < SwapchainImageViews.Length; i++)
+            {
+                SwapchainImageViews[i] = Framebuffer[i].CreateView(new VK.ImageViewCreateInfo(VK.Format.B8G8R8A8UNorm, new VK.ImageSubresourceRange(VK.ImageAspects.Color,0,1,0,1)), Instance.Allocator);
+            }
+            
         }
         
         private VK.PhysicalDevice GetPhysicalDevice(SurfaceKhr surface)
@@ -155,12 +163,14 @@ namespace Catalyst.Rendering
 
         private VK.Device CreateDevice(VK.PhysicalDevice physicalDevice, string[] requiredExtensions)
         {
+            VK.PhysicalDeviceFeatures? features = new VK.PhysicalDeviceFeatures();
+            
             foreach (string extension in requiredExtensions)
                 if (physicalDevice.EnumerateExtensionProperties().All(i => i.ExtensionName != extension))
                     throw new System.Exception($"Required Device Extension: {extension} not found");
             
             //physicalDevice.GetSurfaceSupportKhr()
-            
+            //REWORK https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Physical_devices_and_queue_families
             bool sameGraphicsAndPresent = _graphicsQueueFamilyIndex == _presentQueueFamilyIndex;
             VK.DeviceQueueCreateInfo[] queueCreateInfos = new VK.DeviceQueueCreateInfo[sameGraphicsAndPresent ? 1 : 2];
             queueCreateInfos[0] = new VK.DeviceQueueCreateInfo(_graphicsQueueFamilyIndex, 1, 1.0f);
@@ -169,16 +179,17 @@ namespace Catalyst.Rendering
 
             VK.DeviceCreateInfo deviceCreateInfo = new VK.DeviceCreateInfo(
                 queueCreateInfos,
-                requiredExtensions, physicalDevice.GetFeatures());
+                requiredExtensions, 
+                features);
 
             return physicalDevice.CreateDevice(deviceCreateInfo, Instance.Allocator);
         }
 
-        private static SwapchainKhr CreateSwapchain(VK.Instance instance, VK.Device device, SurfaceKhr surface)
+        private SwapchainKhr CreateSwapchain()
         {
-            SurfaceCapabilitiesKhr capabilities = device.Parent.GetSurfaceCapabilitiesKhr(surface);
-            SurfaceFormatKhr[] formats = device.Parent.GetSurfaceFormatsKhr(surface);
-            PresentModeKhr[] presentModes = device.Parent.GetSurfacePresentModesKhr(surface);
+            SurfaceCapabilitiesKhr capabilities = PhysicalDevice.GetSurfaceCapabilitiesKhr(Surface);
+            SurfaceFormatKhr[] formats = PhysicalDevice.GetSurfaceFormatsKhr(Surface);
+            PresentModeKhr[] presentModes = PhysicalDevice.GetSurfacePresentModesKhr(Surface);
 
             VK.Format format = formats.Length == 1 && formats[0].Format == VK.Format.Undefined
                 ? VK.Format.B8G8R8A8UNorm
@@ -190,21 +201,27 @@ namespace Catalyst.Rendering
                 presentModes.Contains(PresentModeKhr.Fifo) ? PresentModeKhr.Fifo :
                 PresentModeKhr.Immediate; //VSYNC OFF
 
-            return device.CreateSwapchainKhr(new SwapchainCreateInfoKhr(
-                surface: surface,
+            return Device.CreateSwapchainKhr(new SwapchainCreateInfoKhr(
+                surface: Surface,
                 imageFormat: format,
                 imageExtent: capabilities.CurrentExtent,
                 preTransform: capabilities.CurrentTransform,
-                presentMode: presentMode), instance.Allocator);
+                presentMode: presentMode), Instance.Allocator);
         }
         
-        private static SurfaceKhr CreateSurface(Window window)
+        private SurfaceKhr CreateSurface(Window window)
         {
             GLFW3.Vulkan.CreateWindowSurface(Instance.Handle, window, IntPtr.Zero, 
                 out ulong surfaceHandle);
             
             VK.AllocationCallbacks? allocationCallbacks = Instance.Allocator;
             return new SurfaceKhr(Instance, ref allocationCallbacks, (long)surfaceHandle);
+        }
+
+        public VK.ShaderModule CreateShaderModule(byte[] data)
+        {
+            VK.ShaderModuleCreateInfo createInfo = new VK.ShaderModuleCreateInfo(data);
+            return Device.CreateShaderModule(createInfo);
         }
 
         public static IntPtr AllocFunc(IntPtr userData, VK.Size size, VK.Size alignment, VK.SystemAllocationScope allocationScope)

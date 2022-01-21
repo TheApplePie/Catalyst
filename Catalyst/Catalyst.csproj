@@ -47,15 +47,11 @@
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-  
-  <ItemGroup>
-    <ClCompile Include="..\Resources\Shaders\imgui-frag.hlsl" />
-    <ClCompile Include="..\Resources\Shaders\imgui-vertex.hlsl" />
+    <EmbeddedResource Include="..\Resources\**\*" LinkBase="Resources" />
+    <EmbeddedResource Remove="..\Resources\Shaders\**" />
   </ItemGroup>
   
   <ItemGroup>
     <Folder Include="Rendering\Pipelines" />
   </ItemGroup>
-
 </Project>
