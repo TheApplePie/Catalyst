@@ -47,10 +47,10 @@
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <EmbeddedResource Include="..\Resources\**\*" LinkBase="Resources" />
   </ItemGroup>
   
   <ItemGroup>
+    <EmbeddedResource Include="..\Resources\**\*" LinkBase="Resources" />
     <Folder Include="Rendering\Pipelines" />
   </ItemGroup>
 </Project>

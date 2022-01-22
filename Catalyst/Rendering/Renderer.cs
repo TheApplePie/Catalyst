@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-
+using System.Xml;
 using GLFW3;
 using VK = Vulkan;
 using Vulkan.Khr;
@@ -39,6 +40,7 @@ namespace Catalyst.Rendering
         public VK.CommandPool ComputeCommandPool;
 
         public SwapchainKhr Swapchain;
+        public VK.Extent2D Extent;
         public VK.Image[] Framebuffer;
         public VK.ImageView[] SwapchainImageViews;
 
@@ -124,7 +126,21 @@ namespace Catalyst.Rendering
             {
                 SwapchainImageViews[i] = Framebuffer[i].CreateView(new VK.ImageViewCreateInfo(VK.Format.B8G8R8A8UNorm, new VK.ImageSubresourceRange(VK.ImageAspects.Color,0,1,0,1)), Instance.Allocator);
             }
+
+            VK.ShaderModule frag = CreateShaderModule(File.ReadAllBytes("frag.spv"));
+            VK.ShaderModule vert = CreateShaderModule(File.ReadAllBytes("vert.spv"));
+
+            VK.PipelineShaderStageCreateInfo vertShaderStageCreateInfo =
+                new VK.PipelineShaderStageCreateInfo(VK.ShaderStages.Vertex, vert, "main");
+            VK.PipelineShaderStageCreateInfo fragShaderStageCreateInfo =
+                new VK.PipelineShaderStageCreateInfo(VK.ShaderStages.Fragment, frag, "main");
+
+            VK.PipelineShaderStageCreateInfo[] shaderStages = {vertShaderStageCreateInfo, fragShaderStageCreateInfo};
+            //COMEBACK TO THIS
+            VK.PipelineVertexInputStateCreateInfo vertexInputInfo = new VK.PipelineVertexInputStateCreateInfo();
+            Surface.
             
+            VK.Viewport viewport = new VK.Viewport(0,0,)
         }
         
         private VK.PhysicalDevice GetPhysicalDevice(SurfaceKhr surface)
@@ -188,6 +204,9 @@ namespace Catalyst.Rendering
         private SwapchainKhr CreateSwapchain()
         {
             SurfaceCapabilitiesKhr capabilities = PhysicalDevice.GetSurfaceCapabilitiesKhr(Surface);
+
+            actualExtent = capabilities.CurrentExtent;
+            
             SurfaceFormatKhr[] formats = PhysicalDevice.GetSurfaceFormatsKhr(Surface);
             PresentModeKhr[] presentModes = PhysicalDevice.GetSurfacePresentModesKhr(Surface);
 
