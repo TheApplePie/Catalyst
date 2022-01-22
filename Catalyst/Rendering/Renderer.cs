@@ -209,7 +209,7 @@ namespace Catalyst.Rendering
                 presentMode: presentMode), Instance.Allocator);
         }
         
-        private SurfaceKhr CreateSurface(Window window)
+        private static SurfaceKhr CreateSurface(Window window)
         {
             GLFW3.Vulkan.CreateWindowSurface(Instance.Handle, window, IntPtr.Zero, 
                 out ulong surfaceHandle);

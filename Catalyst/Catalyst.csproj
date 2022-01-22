@@ -48,7 +48,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <EmbeddedResource Include="..\Resources\**\*" LinkBase="Resources" />
-    <EmbeddedResource Remove="..\Resources\Shaders\**" />
   </ItemGroup>
   
   <ItemGroup>
