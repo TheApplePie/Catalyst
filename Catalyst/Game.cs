@@ -35,7 +35,7 @@ namespace Catalyst
         
         public Game()
         {
-            State = GameState.Running;
+            State = GameState.Running; //test
         }
 
         public void Start()

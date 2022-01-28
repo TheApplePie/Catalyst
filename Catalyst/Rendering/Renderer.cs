@@ -9,6 +9,9 @@ using VK = Vulkan;
 using Vulkan.Khr;
 using Vulkan.Ext;
 
+//TODO: DEVICE POOLING
+//TODO: VULKAN 1.2
+
 namespace Catalyst.Rendering
 { 
     public class Renderer
@@ -27,7 +30,8 @@ namespace Catalyst.Rendering
             false;
 #endif
 
-        private static DebugReportCallbackExt _debugReportCallback;
+        private static DebugReportCallbackExt debugReportCallback;
+        private static VK.AllocationCallbacks? allocationCallbacks;
 
         public VK.PhysicalDevice PhysicalDevice;
         public VK.Device Device;
@@ -43,6 +47,10 @@ namespace Catalyst.Rendering
         public VK.Extent2D Extent;
         public VK.Image[] Framebuffer;
         public VK.ImageView[] SwapchainImageViews;
+
+        public VK.Framebuffer[] SwapchainFramebuffers;
+        
+        private SurfaceCapabilitiesKhr SurfaceCapabilities;
 
         private int _graphicsQueueFamilyIndex = -1;
         private int _computeQueueFamilyIndex = -1;
@@ -76,11 +84,15 @@ namespace Catalyst.Rendering
             VK.InstanceCreateInfo instanceCreateInfo = new VK.InstanceCreateInfo(AppInfo, requiredLayers, requiredExtensions);
 
             if (UseAllocCallbacks)
+            {
                 Instance = new VK.Instance(instanceCreateInfo,
                     new VK.AllocationCallbacks(
                         AllocFunc,
                         ReallocFunc,
                         FreeFunc));
+
+                allocationCallbacks = Instance.Allocator;
+            }
             else
                 Instance = new VK.Instance(instanceCreateInfo);
 
@@ -89,23 +101,24 @@ namespace Catalyst.Rendering
                 DebugReportCallbackCreateInfoExt debugReportCreateInfo = new DebugReportCallbackCreateInfoExt(
                     DebugReportFlagsExt.All, DebugCallback
                 );
-                _debugReportCallback = Instance.CreateDebugReportCallbackExt(debugReportCreateInfo, Instance.Allocator);
+                debugReportCallback = Instance.CreateDebugReportCallbackExt(debugReportCreateInfo, Instance.Allocator);
             }
         }
 
         public Renderer(Window window) : this(CreateSurface(window)) { }
 
-        public Renderer(SurfaceKhr surface)
+        public unsafe Renderer(SurfaceKhr surface)
         {
             Surface = surface;
-        
-            //Setup Device
+    
+            // Get Device
             PhysicalDevice = GetPhysicalDevice(Surface);
 
-            string[] requiredDeviceExtensions = {"VK_KHR_swapchain"};
-            Device = CreateDevice(PhysicalDevice, requiredDeviceExtensions);
+            string[] deviceExtensions = {"VK_KHR_swapchain"};
+            VK.PhysicalDeviceFeatures deviceFeatures = new VK.PhysicalDeviceFeatures();
+            Device = CreateDevice(PhysicalDevice, deviceExtensions, deviceFeatures);
 
-            // Get queue(s).
+            // Get queues
             GraphicsQueue = Device.GetQueue(_graphicsQueueFamilyIndex);
             ComputeQueue = _computeQueueFamilyIndex == _graphicsQueueFamilyIndex
                 ? GraphicsQueue
@@ -114,11 +127,15 @@ namespace Catalyst.Rendering
                 ? GraphicsQueue
                 : Device.GetQueue(_presentQueueFamilyIndex);
 
-            // Create command pool(s).
+            // Create command pools
             GraphicsCommandPool = Device.CreateCommandPool(new VK.CommandPoolCreateInfo(_graphicsQueueFamilyIndex));
             ComputeCommandPool = Device.CreateCommandPool(new VK.CommandPoolCreateInfo(_computeQueueFamilyIndex));
-
-            Swapchain = CreateSwapchain();
+        
+            // Create Swapchain
+            SurfaceCapabilities = PhysicalDevice.GetSurfaceCapabilitiesKhr(Surface);
+            Extent = SurfaceCapabilities.CurrentExtent;
+        
+            Swapchain = CreateSwapchain(SurfaceCapabilities);
             Framebuffer = Swapchain.GetImages();
             SwapchainImageViews = new VK.ImageView[Framebuffer.Length];
 
@@ -138,9 +155,85 @@ namespace Catalyst.Rendering
             VK.PipelineShaderStageCreateInfo[] shaderStages = {vertShaderStageCreateInfo, fragShaderStageCreateInfo};
             //COMEBACK TO THIS
             VK.PipelineVertexInputStateCreateInfo vertexInputInfo = new VK.PipelineVertexInputStateCreateInfo();
-            Surface.
+            //Surface.
+            VK.PipelineInputAssemblyStateCreateInfo inputAssembly =
+                new VK.PipelineInputAssemblyStateCreateInfo(VK.PrimitiveTopology.TriangleList);
+
+            VK.Viewport viewport = new VK.Viewport(0, 0, Extent.Width, Extent.Width);
+            VK.Rect2D scissor = new VK.Rect2D(0, 0, Extent.Width, Extent.Height);
+        
+            Console.WriteLine($"{Extent.Width} : {Extent.Height}");
+
+            VK.PipelineViewportStateCreateInfo viewportStateCreateInfo =
+                new VK.PipelineViewportStateCreateInfo(viewport, scissor);
+
+            VK.PipelineRasterizationStateCreateInfo rasterizationStateCreateInfo =
+                new VK.PipelineRasterizationStateCreateInfo();
+
+            VK.PipelineMultisampleStateCreateInfo multisampleStateCreateInfo =
+                new VK.PipelineMultisampleStateCreateInfo(VK.SampleCounts.Count1);
+
+            VK.PipelineColorBlendAttachmentState colorBlendAttachmentState = new VK.PipelineColorBlendAttachmentState();
+
+            VK.PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo = new VK.PipelineColorBlendStateCreateInfo();
+        
+            VK.DynamicState[] dynamicStates = {
+                VK.DynamicState.Viewport,
+                VK.DynamicState.LineWidth,
+            };
+        
+            VK.PipelineDynamicStateCreateInfo dynamicState = new VK.PipelineDynamicStateCreateInfo(dynamicStates);
+
+            VK.PipelineLayoutCreateInfo pipelineLayoutInfo = new VK.PipelineLayoutCreateInfo();
+        
+            VK.PipelineLayout pipelineLayout =
+                new VK.PipelineLayout(Device, ref pipelineLayoutInfo, ref allocationCallbacks);
+
+            VK.AttachmentDescription colorAttachment = new VK.AttachmentDescription(VK.AttachmentDescriptions.MayAlias,
+                Swapchain.Format, VK.SampleCounts.Count1, VK.AttachmentLoadOp.Clear, VK.AttachmentStoreOp.Store,
+                VK.AttachmentLoadOp.DontCare, VK.AttachmentStoreOp.DontCare, VK.ImageLayout.Undefined,
+                VK.ImageLayout.PresentSrcKhr);
+
+            VK.AttachmentReference reference = new VK.AttachmentReference(0, VK.ImageLayout.ColorAttachmentOptimal);
+
+            VK.SubpassDescription subpass = new VK.SubpassDescription(new []{reference});
+
+            VK.RenderPassCreateInfo renderPassCreateInfo = new VK.RenderPassCreateInfo(new[] {subpass}, new []{colorAttachment});
+            VK.RenderPass renderPass = new VK.RenderPass(Device, ref renderPassCreateInfo, ref allocationCallbacks);
+
+            VK.GraphicsPipelineCreateInfo graphicsPipelineCreateInfo = new VK.GraphicsPipelineCreateInfo(pipelineLayout,
+                renderPass, 0, shaderStages, inputAssembly, vertexInputInfo, rasterizationStateCreateInfo,
+                viewportState: viewportStateCreateInfo, multisampleState: multisampleStateCreateInfo, dynamicState: dynamicState, colorBlendState: colorBlendStateCreateInfo);
+
+            VK.PipelineCacheCreateInfo cacheCreateInfo = new VK.PipelineCacheCreateInfo();
+        
+            VK.Pipeline graphicsPipeline =
+                new VK.Pipeline(Device, null, ref graphicsPipelineCreateInfo, ref allocationCallbacks);
+
+            SwapchainFramebuffers = new VK.Framebuffer[SwapchainImageViews.Length];
+
+            for (int i = 0; i < SwapchainFramebuffers.Length; i++)
+            {
+                VK.ImageView[] attachments =
+                {
+                    SwapchainImageViews[i]
+                };
             
-            VK.Viewport viewport = new VK.Viewport(0,0,)
+                VK.FramebufferCreateInfo framebufferInfo = new VK.FramebufferCreateInfo(attachments, Extent.Width, Extent.Height);
+
+                SwapchainFramebuffers[i] = new VK.Framebuffer(Device, null, ref framebufferInfo, ref allocationCallbacks);
+            }
+
+            VK.CommandPoolCreateInfo commandPoolCreateInfo = new VK.CommandPoolCreateInfo(_graphicsQueueFamilyIndex);
+            VK.CommandPool commandPool = Device.CreateCommandPool(commandPoolCreateInfo, allocationCallbacks);
+            
+            VK.Semaphore renderFinishedSemaphore = new VK.Semaphore(Device, ref allocationCallbacks);
+            VK.Semaphore imageAvailableSemaphore = new VK.Semaphore(Device, ref allocationCallbacks);
+
+            int imageIndex = Swapchain.AcquireNextImage(semaphore: imageAvailableSemaphore);
+            VK.SubmitInfo submitInfo = new VK.SubmitInfo(new[] {imageAvailableSemaphore}, signalSemaphores: new []{renderFinishedSemaphore});
+        
+            GraphicsQueue.Submit(submitInfo);
         }
         
         private VK.PhysicalDevice GetPhysicalDevice(SurfaceKhr surface)
@@ -177,14 +270,12 @@ namespace Catalyst.Rendering
             throw new System.Exception("No suitable devices found");
         }
 
-        private VK.Device CreateDevice(VK.PhysicalDevice physicalDevice, string[] requiredExtensions)
+        private VK.Device CreateDevice(VK.PhysicalDevice physicalDevice, string[] extensions, VK.PhysicalDeviceFeatures? features)
         {
-            VK.PhysicalDeviceFeatures? features = new VK.PhysicalDeviceFeatures();
-            
-            foreach (string extension in requiredExtensions)
+            foreach (string extension in extensions)
                 if (physicalDevice.EnumerateExtensionProperties().All(i => i.ExtensionName != extension))
                     throw new System.Exception($"Required Device Extension: {extension} not found");
-            
+
             //physicalDevice.GetSurfaceSupportKhr()
             //REWORK https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Physical_devices_and_queue_families
             bool sameGraphicsAndPresent = _graphicsQueueFamilyIndex == _presentQueueFamilyIndex;
@@ -195,18 +286,14 @@ namespace Catalyst.Rendering
 
             VK.DeviceCreateInfo deviceCreateInfo = new VK.DeviceCreateInfo(
                 queueCreateInfos,
-                requiredExtensions, 
+                extensions, 
                 features);
 
             return physicalDevice.CreateDevice(deviceCreateInfo, Instance.Allocator);
         }
 
-        private SwapchainKhr CreateSwapchain()
+        private SwapchainKhr CreateSwapchain(SurfaceCapabilitiesKhr capabilities)
         {
-            SurfaceCapabilitiesKhr capabilities = PhysicalDevice.GetSurfaceCapabilitiesKhr(Surface);
-
-            actualExtent = capabilities.CurrentExtent;
-            
             SurfaceFormatKhr[] formats = PhysicalDevice.GetSurfaceFormatsKhr(Surface);
             PresentModeKhr[] presentModes = PhysicalDevice.GetSurfacePresentModesKhr(Surface);
 
@@ -233,7 +320,6 @@ namespace Catalyst.Rendering
             GLFW3.Vulkan.CreateWindowSurface(Instance.Handle, window, IntPtr.Zero, 
                 out ulong surfaceHandle);
             
-            VK.AllocationCallbacks? allocationCallbacks = Instance.Allocator;
             return new SurfaceKhr(Instance, ref allocationCallbacks, (long)surfaceHandle);
         }
 

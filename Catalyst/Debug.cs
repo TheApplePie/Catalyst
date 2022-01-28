@@ -9,7 +9,7 @@ namespace Catalyst
 
         static Debug()
         {
-            _logStream = File.CreateText( $"log.txt");
+            _logStream = File.CreateText( $"log-{DateTime.Now:s}.txt");
         }
         
         public static void Log(string text)
@@ -17,7 +17,7 @@ namespace Catalyst
 #if DEBUG
             Console.WriteLine(text);
 #endif
-            _logStream.WriteLine($"[{DateTime.Now:yy/MM/dd - HH:mm:ss.fffffff}] {text}");
+            _logStream.WriteLine($"[{DateTime.Now:s}] {text}");
             Flush();
         }
 
